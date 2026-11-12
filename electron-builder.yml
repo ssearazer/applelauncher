@@ -1,0 +1,25 @@
+appId: com.applelauncher.app
+productName: AppleLauncher
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/*.node"
+win:
+  target: [nsis]
+  icon: build/icon.png
+  artifactName: AppleLauncher-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: AppleLauncher
+# Auto-update feed. Replace owner/repo with your GitHub repository and publish releases there.
+publish:
+  provider: github
+  owner: ssearazer
+  repo: applelauncher
