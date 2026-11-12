@@ -1,0 +1,51 @@
+{
+  "name": "applelauncher",
+  "productName": "AppleLauncher",
+  "version": "1.0.0",
+  "description": "Minimal Minecraft Java Edition launcher",
+  "author": "ssearazer",
+  "license": "MIT",
+  "homepage": "https://github.com/ssearazer/applelauncher",
+  "repository": { "type": "git", "url": "https://github.com/ssearazer/applelauncher.git" },
+  "main": "./out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "node --test tests/*.test.ts",
+    "dist": "npm run typecheck && electron-vite build && electron-builder --win"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/yauzl": "^3.4.0",
+    "@types/yazl": "^3.3.1",
+    "@vitejs/plugin-react": "^6.3.0",
+    "electron": "^45.3.1",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "framer-motion": "^14.12.0",
+    "lucide-react": "^1.72.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "skinview3d": "^3.4.2",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  },
+  "dependencies": {
+    "@xmcl/core": "^2.15.1",
+    "@xmcl/installer": "^6.1.2",
+    "@xmcl/task": "^4.1.1",
+    "electron-updater": "^6.8.11",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1",
+    "zod": "^4.6.7"
+  },
+  "allowScripts": {
+    "electron-winstaller@5.4.0": true
+  }
+}
