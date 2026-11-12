@@ -228,7 +228,7 @@ export async function start(id: string, emit: Emit, log: Log, hooks: { started()
       version,
       gameProfile: { id: account.id, name: account.name },
       accessToken: account.token,
-      userType: 'msa' as 'mojang',
+      userType: (account.offline ? 'legacy' : 'msa') as 'mojang',
       properties: {},
       launcherName: 'AppleLauncher',
       launcherBrand: 'AppleLauncher',

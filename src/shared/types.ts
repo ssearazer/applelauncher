@@ -48,6 +48,8 @@ export interface Account {
   skinVariant: 'classic' | 'slim'
   /** false when the stored refresh token no longer works */
   valid: boolean
+  /** local nickname for offline play; only allowed while a licensed account exists */
+  offline?: boolean
 }
 
 export type LaunchPhase = 'idle' | 'preparing' | 'downloading' | 'verifying' | 'launching' | 'running' | 'error'

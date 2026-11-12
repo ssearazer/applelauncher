@@ -4,7 +4,7 @@
 
 Лаунчер Minecraft: Java Edition для Windows: монохромный интерфейс, официальный вход через Microsoft, установка версий и загрузчиков (Fabric, Forge, NeoForge, Quilt), моды и сборки с Modrinth, импорт сборок из Prism Launcher и TLauncher.
 
-> **English.** AppleLauncher is a free, open-source (MIT) launcher for Minecraft: Java Edition on Windows. Players sign in with their own Microsoft account (OAuth 2.0 + PKCE in the system browser; the launcher never sees the password), and the game launches only for accounts that own it: there is no offline or cracked mode. It installs official versions and the Fabric, Forge, NeoForge and Quilt loaders, and manages mods and modpacks from Modrinth. Game files come only from official servers and are checked by hash. Not affiliated with Mojang or Microsoft.
+> **English.** AppleLauncher is a free, open-source (MIT) launcher for Minecraft: Java Edition on Windows. Players sign in with their own Microsoft account (OAuth 2.0 + PKCE in the system browser; the launcher never sees the password), and the game launches only for accounts that own it. Offline nicknames, as in Prism Launcher, unlock only after a Microsoft account is added; there is no cracked mode. It installs official versions and the Fabric, Forge, NeoForge and Quilt loaders, and manages mods and modpacks from Modrinth. Game files come only from official servers and are checked by hash. Not affiliated with Mojang or Microsoft.
 
 Electron 45, TypeScript, React 19, Vite (electron-vite), Tailwind 4, Framer Motion, lucide-react. Установку и запуск игры выполняют `@xmcl/core` и `@xmcl/installer`.
 
@@ -74,7 +74,7 @@ tests/           тесты node:test
 - Пути из архивов и ответов API проходят `safeJoin` и не выходят за папку профиля. Файлы и папки пользователь выбирает только в системных диалогах.
 - Загрузки идут только по HTTPS, во временный файл, с проверкой SHA-1/SHA-512 и повторами с паузой. В `.mrpack` разрешены лишь хосты из белого списка Modrinth.
 - Внешние ссылки открываются только для белого списка доменов.
-- Нет офлайн-режима и обхода лицензии: без купленной игры Mojang вернёт отказ, и лаунчер скажет, что лицензии нет.
+- Нет обхода лицензии: без купленной игры Mojang вернёт отказ, и лаунчер скажет, что лицензии нет. Оффлайн-ник (как в Prism Launcher) можно добавить, только пока в лаунчер добавлен аккаунт Microsoft; он работает в одиночной игре, по LAN и на серверах с `online-mode=false`.
 
 ## Отступления от макета
 

@@ -77,6 +77,12 @@ const ru = {
   'accounts.empty': 'Вы ещё не вошли ни в один аккаунт.',
   'accounts.privacy': 'Вход проходит на сайте Microsoft в вашем браузере. Лаунчер не видит пароль и хранит только зашифрованный токен.',
   'accounts.welcome': 'Вы вошли как {name}',
+  'accounts.offline': 'Оффлайн-аккаунт',
+  'accounts.offlineTitle': 'Оффлайн-аккаунт',
+  'accounts.offlineNick': 'Ник',
+  'accounts.offlineAdd': 'Добавить',
+  'accounts.offlineHint': 'Латиница, цифры и _, от 3 до 16 символов. Работает в одиночной игре, по LAN и на серверах, где в server.properties стоит online-mode=false.',
+  'accounts.offlineLocked': 'Доступно после входа в аккаунт Microsoft с купленной Minecraft: Java Edition.',
 
   'logs.title': 'Журнал запуска',
   'logs.copy': 'Скопировать',
@@ -161,6 +167,8 @@ const ru = {
   'skins.wasReset': 'Скин сброшен',
   'skins.signIn': 'Войдите, чтобы менять скин',
   'skins.signInText': 'Скин хранится в вашем аккаунте Minecraft и меняется через сервис Mojang.',
+  'skins.offline': 'У оффлайн-аккаунта нет скина',
+  'skins.offlineText': 'Скины хранятся в сервисе Mojang. Выберите лицензионный аккаунт, чтобы сменить скин.',
 
   'settings.appearance': 'Оформление',
   'settings.minecraft': 'Minecraft',
@@ -306,6 +314,12 @@ const en: Record<Key, string> = {
   'accounts.empty': 'You have not signed in yet.',
   'accounts.privacy': 'You sign in on the Microsoft site in your browser. The launcher never sees your password and stores only an encrypted token.',
   'accounts.welcome': 'Signed in as {name}',
+  'accounts.offline': 'Offline account',
+  'accounts.offlineTitle': 'Offline account',
+  'accounts.offlineNick': 'Nickname',
+  'accounts.offlineAdd': 'Add',
+  'accounts.offlineHint': 'Latin letters, digits and _, 3 to 16 characters. Works in singleplayer, over LAN and on servers with online-mode=false in server.properties.',
+  'accounts.offlineLocked': 'Available after you sign in with a Microsoft account that owns Minecraft: Java Edition.',
 
   'logs.title': 'Launch log',
   'logs.copy': 'Copy',
@@ -390,6 +404,8 @@ const en: Record<Key, string> = {
   'skins.wasReset': 'Skin reset',
   'skins.signIn': 'Sign in to change your skin',
   'skins.signInText': 'Your skin lives in your Minecraft account and changes through Mojang.',
+  'skins.offline': 'Offline accounts have no skin',
+  'skins.offlineText': 'Skins live in the Mojang service. Pick a licensed account to change your skin.',
 
   'settings.appearance': 'Appearance',
   'settings.minecraft': 'Minecraft',

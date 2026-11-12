@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { readFile } from 'node:fs/promises'
 import type { Account } from '../shared/types'
+import { OFFLINE_NAME, offlineUuid } from './offline'
 import { getSettings, readStore, setSettings, writeJson } from './store'
 import { HttpError, getJson, postJson, request } from './net'
 
@@ -22,10 +23,11 @@ interface StoredAccount {
   name: string
   skinUrl?: string
   skinVariant: 'classic' | 'slim'
-  refresh: string // encrypted, base64
+  refresh?: string // encrypted, base64; absent for offline accounts
   mcToken?: string // encrypted, base64
   mcExpires?: number
   valid: boolean
+  offline?: boolean
 }
 
 const enc = (s: string) => {
@@ -38,7 +40,20 @@ let accounts: StoredAccount[] = readStore<StoredAccount[]>('accounts.json', [])
 const save = () => writeJson('accounts.json', accounts)
 
 export const listAccounts = (): Account[] =>
-  accounts.map(({ id, name, skinUrl, skinVariant, valid }) => ({ id, name, skinUrl, skinVariant, valid }))
+  accounts.map(({ id, name, skinUrl, skinVariant, valid, offline }) => ({ id, name, skinUrl, skinVariant, valid, offline }))
+
+const hasLicence = () => accounts.some((a) => !a.offline)
+
+/** Offline nickname, Prism-style: allowed only for someone who has added a Microsoft account that owns the game. */
+export function addOffline(name: string): Account {
+  if (!hasLicence()) throw new Error('Сначала войдите в аккаунт Microsoft с купленной Minecraft: Java Edition')
+  if (!OFFLINE_NAME.test(name)) throw new Error('Ник: 3–16 символов, латиница, цифры и _')
+  const id = offlineUuid(name)
+  if (!accounts.some((a) => a.id === id)) accounts = [...accounts, { id, name, skinVariant: 'classic', valid: true, offline: true }]
+  save()
+  setSettings({ selectedAccount: id })
+  return listAccounts().find((a) => a.id === id)!
+}
 
 const b64url = (b: Buffer) => b.toString('base64url')
 
@@ -182,12 +197,16 @@ export function logout(id: string): void {
 }
 
 /** Returns a usable Minecraft token, refreshing the Microsoft chain when it is close to expiry. */
-export async function ensureFresh(id: string | undefined): Promise<{ id: string; name: string; token: string }> {
+export async function ensureFresh(id: string | undefined): Promise<{ id: string; name: string; token: string; offline?: boolean }> {
   const acc = accounts.find((a) => a.id === id)
   if (!acc) throw new Error('Войдите в аккаунт Microsoft, чтобы играть')
+  if (acc.offline) {
+    if (!hasLicence()) throw new Error('Оффлайн-аккаунт работает, только пока в лаунчер добавлен аккаунт Microsoft с купленной игрой')
+    return { id: acc.id, name: acc.name, token: '0', offline: true }
+  }
   if (acc.mcToken && (acc.mcExpires ?? 0) > Date.now() + 5 * 60_000) return { id: acc.id, name: acc.name, token: dec(acc.mcToken) }
   try {
-    const ms = await msToken({ grant_type: 'refresh_token', refresh_token: dec(acc.refresh) })
+    const ms = await msToken({ grant_type: 'refresh_token', refresh_token: dec(acc.refresh!) })
     const fresh = upsert(ms.refresh_token, await minecraftLogin(ms.access_token))
     return { id: fresh.id, name: fresh.name, token: dec(fresh.mcToken!) }
   } catch (e) {
@@ -218,7 +237,12 @@ async function refreshProfile(id: string, token: string) {
   save()
 }
 
+const needOnline = (id: string) => {
+  if (accounts.find((a) => a.id === id)?.offline) throw new Error('У оффлайн-аккаунта нет скина в сервисе Mojang')
+}
+
 export async function uploadSkin(id: string, file: string, variant: 'classic' | 'slim'): Promise<void> {
+  needOnline(id)
   const png = await readFile(file)
   // PNG signature + IHDR width/height: Minecraft accepts 64x64 or legacy 64x32
   const isPng = png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
@@ -233,6 +257,7 @@ export async function uploadSkin(id: string, file: string, variant: 'classic' | 
 }
 
 export async function resetSkin(id: string): Promise<void> {
+  needOnline(id)
   const { token } = await ensureFresh(id)
   await request('https://api.minecraftservices.com/minecraft/profile/skins/active', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
   await refreshProfile(id, token)

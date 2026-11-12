@@ -7,6 +7,7 @@ import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LOADERS, type JobState, type LaunchState, type Settings } from '../shared/types'
 import * as accounts from './accounts'
+import { OFFLINE_NAME } from './offline'
 import * as instances from './instances'
 import * as mc from './minecraft'
 import * as mods from './mods'
@@ -206,6 +207,7 @@ function registerIpc() {
 
   handle('accounts:list', [], () => accounts.listAccounts())
   handle('accounts:login', [], () => accounts.login())
+  handle('accounts:addOffline', [z.string().regex(OFFLINE_NAME)], (n) => accounts.addOffline(n))
   handle('accounts:logout', [z.string()], (a) => accounts.logout(a))
   handle('accounts:skin', [z.string()], (a) => accounts.skinDataUrl(a))
   handle('accounts:uploadSkin', [z.string(), z.enum(['classic', 'slim'])], async (a, variant) => {
