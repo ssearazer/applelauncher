@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { safeJoin } from '../src/main/safe-path.ts'
+import { offlineUuid } from '../src/main/offline.ts'
 import { errorText, fromMmcPack, fromVersionJson, javaFor, neoForgeMatches, splitArgs } from '../src/shared/pure.ts'
 
 test('neoForgeMatches maps NeoForge versions to the game version', () => {
@@ -58,4 +59,8 @@ test('errorText unwraps AggregateError', () => {
   assert.equal(errorText(new AggregateError([new Error('HTTP 404 x')])), 'HTTP 404 x')
   assert.match(errorText(new AggregateError([new Error('a'), new Error('b')])), /2.*a$/)
   assert.equal(errorText(Object.assign(new Error(''), { code: 'ECONNRESET' })), 'ECONNRESET')
+})
+
+test('offlineUuid matches the server offline-mode UUID', () => {
+  assert.equal(offlineUuid('Notch'), 'b50ad385829d3141a2167e7d7539ba7f')
 })

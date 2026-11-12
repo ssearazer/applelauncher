@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Blocks, Boxes, Home, Layers, LogIn, Plus, Settings, Shirt, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api, formatBytes, useApp, type Page } from '../state'
-import { Button, IconButton, Modal, Progress, cx } from '../ui'
+import { Button, IconButton, Input, Modal, Progress, cx } from '../ui'
 import { Avatar } from './Avatar'
 import iconUrl from '../assets/icon.svg'
 
@@ -45,7 +45,7 @@ export function Sidebar() {
         {account ? <Avatar accountId={account.id} skinUrl={account.skinUrl} name={account.name} size={34} /> : <div className="grid size-[34px] place-items-center rounded-[8px] border border-line text-muted"><UserRound size={16} /></div>}
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium">{account?.name ?? t('accounts.none')}</div>
-          <div className="truncate text-[12px] text-muted">{account ? (account.valid ? t('accounts.licensed') : t('accounts.expired')) : t('accounts.signInHint')}</div>
+          <div className="truncate text-[12px] text-muted">{account ? t(account.offline ? 'accounts.offline' : account.valid ? 'accounts.licensed' : 'accounts.expired') : t('accounts.signInHint')}</div>
         </div>
       </button>
     </aside>
@@ -148,6 +148,17 @@ export function TitleBar() {
 export function AccountsDialog() {
   const { dialogs, accounts, account, setSettings, reloadAccounts, attempt, t, toast } = useApp()
   const [waiting, setWaiting] = useState(false)
+  const [nick, setNick] = useState('')
+  const licensed = accounts.some((a) => !a.offline)
+  const nickOk = /^[A-Za-z0-9_]{3,16}$/.test(nick)
+  const addOffline = async () => {
+    const acc = await attempt(() => api.accounts.addOffline(nick))
+    if (acc) {
+      setNick('')
+      await reloadAccounts()
+      await setSettings({ selectedAccount: acc.id })
+    }
+  }
   const login = async () => {
     setWaiting(true)
     const acc = await attempt(() => api.accounts.login())
@@ -167,7 +178,7 @@ export function AccountsDialog() {
               <Avatar accountId={a.id} skinUrl={a.skinUrl} name={a.name} size={36} />
               <div>
                 <div className="text-[13px] font-medium">{a.name}</div>
-                <div className="text-[12px] text-muted">{a.valid ? t('accounts.licensed') : t('accounts.expired')}</div>
+                <div className="text-[12px] text-muted">{t(a.offline ? 'accounts.offline' : a.valid ? 'accounts.licensed' : 'accounts.expired')}</div>
               </div>
             </button>
             <IconButton label={t('accounts.signOut')} onClick={async () => { await attempt(() => api.accounts.logout(a.id)); await reloadAccounts() }}>
@@ -181,6 +192,14 @@ export function AccountsDialog() {
         {waiting ? t('accounts.waiting') : <><LogIn size={14} /> {accounts.length ? t('accounts.add') : t('accounts.signIn')}</>}
       </Button>
       <p className="mt-3 text-[12px] text-muted">{t('accounts.privacy')}</p>
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="text-[13px] font-medium">{t('accounts.offlineTitle')}</div>
+        <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (nickOk) void addOffline() }}>
+          <Input value={nick} onChange={(e) => setNick(e.target.value)} maxLength={16} disabled={!licensed} placeholder={t('accounts.offlineNick')} aria-label={t('accounts.offlineNick')} className="flex-1" />
+          <Button type="submit" disabled={!licensed || !nickOk}>{t('accounts.offlineAdd')}</Button>
+        </form>
+        <p className="mt-2 text-[12px] text-muted">{t(licensed ? 'accounts.offlineHint' : 'accounts.offlineLocked')}</p>
+      </div>
     </Modal>
   )
 }

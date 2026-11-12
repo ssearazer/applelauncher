@@ -38,6 +38,13 @@ export function Skins() {
     if (viewer.current && skin) void viewer.current.loadSkin(skin, { model: variant === 'slim' ? 'slim' : 'default' })
   }, [skin, variant, account, settings.animations])
 
+  if (account?.offline)
+    return (
+      <div>
+        <PageHeader title={t('nav.skins')} />
+        <Empty icon={<Shirt size={20} />} title={t('skins.offline')} text={t('skins.offlineText')} />
+      </div>
+    )
   if (!account)
     return (
       <div>
