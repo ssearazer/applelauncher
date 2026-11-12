@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2b2b"/><stop offset="1" stop-color="#050505"/></linearGradient>
+    <linearGradient id="fruit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b4b4b4"/></linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#tile)"/>
+  <rect x="2.4" y="2.4" width="59.2" height="59.2" rx="13.6" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width=".8"/>
+  <g transform="rotate(-16 32 37)" fill="none" stroke="#fff" stroke-width="1.7">
+    <path d="M10 37A22 6 0 0 1 54 37" stroke-opacity=".35"/>
+  </g>
+  <path d="M32 23C27 19.6 18.5 20.2 17 28.5 15.6 37 20.5 46.6 25.8 49.2 28.2 50.3 30 49.4 32 49.4S35.8 50.3 38.2 49.2C43.5 46.6 48.4 37 47 28.5 45.5 20.2 37 19.6 32 23Z" fill="url(#fruit)"/>
+  <path d="M32 23C32 19.6 32.8 17.2 34.6 15.2" fill="none" stroke="#d9d9d9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M34 18.4C35.6 14.4 39.6 12.9 43.6 13.8 42.3 17.6 38.2 19.4 34 18.4Z" fill="#e6e6e6"/>
+  <g transform="rotate(-16 32 37)" fill="none" stroke="#fff" stroke-width="1.7">
+    <path d="M10 37A22 6 0 0 0 54 37"/>
+  </g>
+</svg>

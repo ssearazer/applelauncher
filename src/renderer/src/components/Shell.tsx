@@ -4,16 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { api, formatBytes, useApp, type Page } from '../state'
 import { Button, IconButton, Modal, Progress, cx } from '../ui'
 import { Avatar } from './Avatar'
+import iconUrl from '../assets/icon.svg'
 
 export function AppIcon({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden>
-      <rect width="64" height="64" rx="15" fill="currentColor" />
-      <path d="M32 14 47 22.5 32 31 17 22.5Z" fill="var(--bg)" opacity=".95" />
-      <path d="M17 25.5 30.5 33.5V50L17 42Z" fill="var(--bg)" opacity=".6" />
-      <path d="M47 25.5 33.5 33.5V50L47 42Z" fill="var(--bg)" opacity=".35" />
-    </svg>
-  )
+  return <img src={iconUrl} width={size} height={size} alt="" draggable={false} />
 }
 
 const NAV: { id: Page; icon: typeof Home }[] = [

@@ -1,3 +1,5 @@
+<p align="center"><img src="build/icon.png" width="128" alt="AppleLauncher"></p>
+
 # AppleLauncher
 
 Лаунчер Minecraft: Java Edition для Windows: монохромный интерфейс, официальный вход через Microsoft, установка версий и загрузчиков (Fabric, Forge, NeoForge, Quilt), моды и сборки с Modrinth, импорт сборок из Prism Launcher и TLauncher.
@@ -23,7 +25,7 @@ npm run dev
 | `npm test` | Юнит-тесты чистых функций (`tests/`) |
 | `npm run build` | Сборка в `out/` |
 | `npm run dist` | Проверка типов, сборка и установщик NSIS в `dist/AppleLauncher-Setup-<версия>.exe` |
-| `node scripts/make-icon.mjs` | Пересоздать `build/icon.png` |
+| `npx electron scripts/make-icon.mjs` | Пересоздать `build/icon.png` из `src/renderer/src/assets/icon.svg` |
 
 Нужен Node.js 22.6 или новее: тесты запускают TypeScript без сборки.
 
