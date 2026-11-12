@@ -49,6 +49,7 @@ const api = {
   accounts: {
     list: () => call<Account[]>('accounts:list'),
     login: () => call<Account>('accounts:login'),
+    addOffline: (name: string) => call<Account>('accounts:addOffline', name),
     logout: (id: string) => call<void>('accounts:logout', id),
     skin: (id: string) => call<string | undefined>('accounts:skin', id),
     uploadSkin: (id: string, variant: 'classic' | 'slim') => call<boolean>('accounts:uploadSkin', id, variant),
