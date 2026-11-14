@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Api } from '../../preload/index'
-import type { Account, Instance, JobState, LaunchState, Settings } from '../../shared/types'
+import type { Account, Instance, JobState, Language, LaunchState, Settings } from '../../shared/types'
 import { makeT, type T } from './i18n'
 
 declare global {
@@ -46,6 +46,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [accountsOpen, setAccountsOpen] = useState(false)
   const [logsOpen, setLogsOpen] = useState(false)
   const seq = useRef(0)
+  // the update event can arrive before settings load; this ref gives the toast the current language without resubscribing
+  const lang = useRef<Language>('ru')
+  lang.current = settings?.language ?? 'ru'
 
   const toast = useCallback((text: string, kind: Toast['kind'] = 'info') => {
     const id = ++seq.current
@@ -77,11 +80,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (s.phase === 'idle' || s.phase === 'error') void reloadInstances()
     })
     const offJob = api.app.onJob((j) => setJobs((all) => ({ ...all, [j.id]: j })))
+    const offUpdate = api.app.onUpdate((u) => u.status === 'available' && toast(makeT(lang.current)(u.via === 'github' ? 'settings.updManual' : 'settings.updAvailable', { v: u.version })))
     return () => {
       offState()
       offJob()
+      offUpdate()
     }
-  }, [reloadInstances, reloadAccounts])
+  }, [reloadInstances, reloadAccounts, toast])
 
   const setSettings = useCallback(
     async (p: Partial<Settings>) => {

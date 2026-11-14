@@ -42,11 +42,8 @@ const save = () => writeJson('accounts.json', accounts)
 export const listAccounts = (): Account[] =>
   accounts.map(({ id, name, skinUrl, skinVariant, valid, offline }) => ({ id, name, skinUrl, skinVariant, valid, offline }))
 
-const hasLicence = () => accounts.some((a) => !a.offline)
-
-/** Offline nickname, Prism-style: allowed only for someone who has added a Microsoft account that owns the game. */
+/** Local nickname for offline play; no Microsoft account is required. */
 export function addOffline(name: string): Account {
-  if (!hasLicence()) throw new Error('Сначала войдите в аккаунт Microsoft с купленной Minecraft: Java Edition')
   if (!OFFLINE_NAME.test(name)) throw new Error('Ник: 3–16 символов, латиница, цифры и _')
   const id = offlineUuid(name)
   if (!accounts.some((a) => a.id === id)) accounts = [...accounts, { id, name, skinVariant: 'classic', valid: true, offline: true }]
@@ -61,6 +58,8 @@ const b64url = (b: Buffer) => b.toString('base64url')
 const BUILT_IN_CLIENT_ID = 'cf19bd3a-0d9c-4c7a-b791-4ca1647cb852'
 const clientId = () => getSettings().msClientId.trim() || process.env.APPLELAUNCHER_MS_CLIENT_ID || BUILT_IN_CLIENT_ID
 
+let cancelPending: (() => void) | undefined
+
 /** Opens the browser and resolves with the authorization code from the loopback redirect. */
 function authorize(): Promise<{ code: string; verifier: string; redirect: string }> {
   const verifier = b64url(randomBytes(32))
@@ -72,6 +71,7 @@ function authorize(): Promise<{ code: string; verifier: string; redirect: string
       const url = new URL(req.url ?? '/', 'http://localhost')
       if (url.pathname !== '/') return res.writeHead(404).end()
       const done = (ok: boolean, text: string) => {
+        cancelPending = undefined
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
         res.end(`<!doctype html><meta charset="utf-8"><title>AppleLauncher</title><body style="font:16px -apple-system,Segoe UI,sans-serif;background:#080808;color:#fff;display:grid;place-items:center;height:100vh;margin:0"><p>${text}</p></body>`)
         clearTimeout(timer)
@@ -94,6 +94,12 @@ function authorize(): Promise<{ code: string; verifier: string; redirect: string
       server.close()
       reject(new Error('Время ожидания входа истекло'))
     }, 5 * 60_000)
+    cancelPending = () => {
+      clearTimeout(timer)
+      server.close()
+      server.closeAllConnections?.()
+      reject(new Error('Вход отменён'))
+    }
     server.listen(0, () => {
       redirect = `http://localhost:${(server.address() as AddressInfo).port}`
       const q = new URLSearchParams({
@@ -109,6 +115,11 @@ function authorize(): Promise<{ code: string; verifier: string; redirect: string
       void shell.openExternal(`${AUTH}/authorize?${q}`)
     })
   })
+}
+
+export function cancelLogin(): void {
+  cancelPending?.()
+  cancelPending = undefined
 }
 
 async function msToken(params: Record<string, string>): Promise<{ access_token: string; refresh_token: string }> {
@@ -199,9 +210,8 @@ export function logout(id: string): void {
 /** Returns a usable Minecraft token, refreshing the Microsoft chain when it is close to expiry. */
 export async function ensureFresh(id: string | undefined): Promise<{ id: string; name: string; token: string; offline?: boolean }> {
   const acc = accounts.find((a) => a.id === id)
-  if (!acc) throw new Error('Войдите в аккаунт Microsoft, чтобы играть')
+  if (!acc) throw new Error('Добавьте и выберите аккаунт, чтобы играть')
   if (acc.offline) {
-    if (!hasLicence()) throw new Error('Оффлайн-аккаунт работает, только пока в лаунчер добавлен аккаунт Microsoft с купленной игрой')
     return { id: acc.id, name: acc.name, token: '0', offline: true }
   }
   if (acc.mcToken && (acc.mcExpires ?? 0) > Date.now() + 5 * 60_000) return { id: acc.id, name: acc.name, token: dec(acc.mcToken) }

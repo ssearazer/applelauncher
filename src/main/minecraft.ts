@@ -5,7 +5,7 @@ import {
   installJavaRuntimeTask, type JavaRuntimeManifest, type MinecraftVersion
 } from '@xmcl/installer'
 import type { Task } from '@xmcl/task'
-import type { ChildProcess } from 'node:child_process'
+import { execFile, type ChildProcess } from 'node:child_process'
 import { createWriteStream, existsSync, type WriteStream } from 'node:fs'
 import { readdir, rm, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
@@ -147,6 +147,15 @@ async function ensureJava(version: ResolvedVersion, inst: Instance, emit: Emit):
   return exe
 }
 
+/** Timeouts / resets while talking to the Mojang CDN: worth retrying, unlike a bad hash or a 404. */
+function isNetworkError(e: unknown): boolean {
+  const flat = (x: unknown): unknown[] => (x instanceof AggregateError ? x.errors.flatMap(flat) : [x])
+  return flat(e).some((x) => {
+    const text = `${(x as { code?: string })?.code ?? ''} ${(x as { cause?: { code?: string } })?.cause?.code ?? ''} ${(x as Error)?.name ?? ''} ${(x as Error)?.message ?? ''}`
+    return /TIMEOUT|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|UND_ERR|SocketError|terminated|fetch failed/i.test(text)
+  })
+}
+
 /* ---------- install ---------- */
 
 /** Installs (or re-checks) vanilla + loader for an instance and returns the resolved version. */
@@ -193,10 +202,24 @@ export async function prepare(inst: Instance, emit: Emit): Promise<{ version: Re
 
   emit({ phase: 'verifying', detail: 'Библиотеки и ресурсы' })
   const version = await Version.parse(root, versionId!)
-  // installDependencies re-validates libraries and assets by sha1 and re-downloads anything broken
-  await run(installDependenciesTask(version), (d, t, x) =>
-    emit({ phase: 'verifying', detail: 'Библиотеки и ресурсы', progress: t ? d / t : undefined, doneBytes: d, totalBytes: t, ...x })
-  )
+  // installDependencies re-validates libraries and assets by sha1 and re-downloads only what is missing or broken.
+  // On flaky networks (e.g. connect timeouts to resources.download.minecraft.net) hundreds of parallel requests fail at once,
+  // so keep concurrency low and re-run the pass a few times: each retry only fetches the files that are still missing.
+  const attempts = 5
+  for (let i = 1; ; i++) {
+    try {
+      await run(
+        installDependenciesTask(version, { assetsDownloadConcurrency: 8, librariesDownloadConcurrency: 8 }),
+        (d, t, x) =>
+          emit({ phase: 'verifying', detail: i > 1 ? `Библиотеки и ресурсы (попытка ${i}/${attempts})` : 'Библиотеки и ресурсы', progress: t ? d / t : undefined, doneBytes: d, totalBytes: t, ...x })
+      )
+      break
+    } catch (err) {
+      if (i >= attempts || !isNetworkError(err)) throw err
+      emit({ phase: 'downloading', detail: `Сеть нестабильна, повтор ${i + 1}/${attempts}…` })
+      await new Promise((r) => setTimeout(r, 1500 * i))
+    }
+  }
   return { version, java }
 }
 
@@ -206,9 +229,30 @@ let proc: ChildProcess | undefined
 let logFile: WriteStream | undefined
 export const isRunning = () => !!proc
 
+/** True while a background download (for example an AI modpack's game files) is running. */
+let prefetching = false
+
+/**
+ * Downloads the game, the loader, Java and every library and asset of an instance without launching it, so the first
+ * Play is instant. Reports through `emit` only: the launcher's own launch state stays untouched.
+ */
+export async function prefetch(inst: Instance, emit: Emit): Promise<void> {
+  if (proc || current || prefetching) throw new Error('Игра сейчас занята другой задачей')
+  prefetching = true
+  try {
+    await prepare(inst, emit)
+  } finally {
+    prefetching = false
+  }
+}
+export const cancelPrefetch = async (): Promise<void> => {
+  if (prefetching) await current?.cancel()
+}
+
 
 export async function start(id: string, emit: Emit, log: Log, hooks: { started(): void; exited(): void }): Promise<void> {
   if (proc) throw new Error('Minecraft уже запущен')
+  if (prefetching) throw new Error('Идёт скачивание игры для ИИ-сборки. Подождите, пока оно закончится')
   const inst = getInstance(id)
   const s = getSettings()
   const base = { instanceId: id }
@@ -268,6 +312,26 @@ export async function start(id: string, emit: Emit, log: Log, hooks: { started()
     log(`[AppleLauncher] ${message}`)
     e({ phase: 'error', error: message })
   }
+}
+
+/**
+ * Asks Minecraft to close like the window's X button would, so the world is saved first.
+ * On Windows `taskkill` without /F posts WM_CLOSE; if the game is still alive after 15 s it is killed.
+ */
+export function closeGame(): Promise<void> {
+  const p = proc
+  if (!p || p.exitCode !== null) return Promise.resolve()
+  return new Promise((resolve) => {
+    const force = setTimeout(() => p.kill(), 15_000)
+    const giveUp = setTimeout(resolve, 20_000)
+    p.once('exit', () => {
+      clearTimeout(force)
+      clearTimeout(giveUp)
+      resolve()
+    })
+    if (process.platform === 'win32' && p.pid) execFile('taskkill', ['/PID', String(p.pid), '/T'], () => undefined)
+    else p.kill('SIGTERM')
+  })
 }
 
 export async function cancel(): Promise<void> {

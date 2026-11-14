@@ -52,13 +52,13 @@ export async function postJson<T>(url: string, body: unknown, headers: Record<st
   })
 }
 
-export async function fileHash(path: string, algorithm: 'sha1' | 'sha512'): Promise<string> {
+export async function fileHash(path: string, algorithm: 'sha1' | 'sha256' | 'sha512'): Promise<string> {
   const h = createHash(algorithm)
   await pipeline(createReadStream(path), h)
   return h.digest('hex')
 }
 
-export interface Hashes { sha1?: string; sha512?: string }
+export interface Hashes { sha1?: string; sha256?: string; sha512?: string }
 
 /** Download to `dest` via a temp file; verifies any provided hash before the file appears. */
 export async function download(urls: string | string[], dest: string, hashes: Hashes = {}, onBytes?: (n: number) => void): Promise<void> {
@@ -75,7 +75,7 @@ export async function download(urls: string | string[], dest: string, hashes: Ha
         const body = Readable.fromWeb(res.body as never)
         if (onBytes) body.on('data', (c: Buffer) => onBytes(c.length))
         await pipeline(body, createWriteStream(tmp))
-        for (const algo of ['sha512', 'sha1'] as const) {
+        for (const algo of ['sha512', 'sha256', 'sha1'] as const) {
           const want = hashes[algo]
           if (want && (await fileHash(tmp, algo)) !== want.toLowerCase()) {
             throw new Error(`Контрольная сумма не совпала: ${url}`)

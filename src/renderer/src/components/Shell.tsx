@@ -149,7 +149,6 @@ export function AccountsDialog() {
   const { dialogs, accounts, account, setSettings, reloadAccounts, attempt, t, toast } = useApp()
   const [waiting, setWaiting] = useState(false)
   const [nick, setNick] = useState('')
-  const licensed = accounts.some((a) => !a.offline)
   const nickOk = /^[A-Za-z0-9_]{3,16}$/.test(nick)
   const addOffline = async () => {
     const acc = await attempt(() => api.accounts.addOffline(nick))
@@ -195,10 +194,10 @@ export function AccountsDialog() {
       <div className="mt-5 border-t border-line pt-4">
         <div className="text-[13px] font-medium">{t('accounts.offlineTitle')}</div>
         <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (nickOk) void addOffline() }}>
-          <Input value={nick} onChange={(e) => setNick(e.target.value)} maxLength={16} disabled={!licensed} placeholder={t('accounts.offlineNick')} aria-label={t('accounts.offlineNick')} className="flex-1" />
-          <Button type="submit" disabled={!licensed || !nickOk}>{t('accounts.offlineAdd')}</Button>
+          <Input value={nick} onChange={(e) => setNick(e.target.value)} maxLength={16} placeholder={t('accounts.offlineNick')} aria-label={t('accounts.offlineNick')} className="flex-1" />
+          <Button type="submit" disabled={!nickOk}>{t('accounts.offlineAdd')}</Button>
         </form>
-        <p className="mt-2 text-[12px] text-muted">{t(licensed ? 'accounts.offlineHint' : 'accounts.offlineLocked')}</p>
+        <p className="mt-2 text-[12px] text-muted">{t('accounts.offlineHint')}</p>
       </div>
     </Modal>
   )

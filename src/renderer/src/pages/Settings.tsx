@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Settings as S } from '../../../shared/types'
 import { api, useApp } from '../state'
 import { Button, Group, Input, PageHeader, Row, Segmented, Select, Toggle, cx } from '../ui'
+import { CurseForgeKeyInput, useCurseForge } from './Mods'
 
 type Section = 'appearance' | 'minecraft' | 'launcher' | 'advanced'
 const SECTIONS: { id: Section; icon: typeof Cpu }[] = [
@@ -156,7 +157,12 @@ function Launcher() {
     setChecking(true)
     const r = await attempt(() => api.app.checkUpdates())
     setChecking(false)
-    if (r) toast(r.status === 'dev' ? t('settings.updDev') : r.status === 'latest' ? t('settings.updLatest') : t('settings.updAvailable', { v: r.version ?? '' }))
+    if (!r) return
+    if (r.status === 'dev') return toast(t('settings.updDev'))
+    if (r.status === 'latest') return toast(t('settings.updLatest'))
+    // electron-updater downloads by itself and installs on exit; a release without latest.yml needs an explicit go-ahead
+    if (r.via === 'feed') return toast(t('settings.updAvailable', { v: r.version }))
+    if (confirm(t('settings.updInstall', { v: r.version }))) await attempt(() => api.app.installUpdate())
   }
   return (
     <>
@@ -191,6 +197,7 @@ function Advanced() {
   const { t, settings: s, attempt, toast, selected, launch, dialogs } = useApp()
   const set = useSet()
   const [info, setInfo] = useState<Awaited<ReturnType<typeof api.app.info>>>()
+  const curse = useCurseForge()
   useEffect(() => void api.app.info().then(setInfo), [])
   const busy = ['preparing', 'downloading', 'verifying', 'launching', 'running'].includes(launch.phase)
   return (
@@ -203,6 +210,23 @@ function Advanced() {
         <Row label={t('settings.azureGuide')}>
           <Button size="sm" variant="ghost" onClick={() => attempt(() => api.app.openExternal('https://aka.ms/mce-reviewappid'))}>{t('settings.openGuide')}</Button>
         </Row>
+      </Group>
+      <Group title={t('settings.ai')}>
+        <Row label={t('settings.aiKey')} hint={t('settings.aiKeyHint')}>
+          <TextField value={s.aiKey ?? ''} onSave={set('aiKey')} placeholder="sk-or-v1-…" />
+        </Row>
+      </Group>
+      <Group title={t('settings.curseforge')}>
+        {curse.status?.hasKey ? (
+          <Row label={t('mods.cfConnected')} hint={curse.status.source === 'env' ? t('mods.cfKeyEnv') : undefined}>
+            {curse.status.source === 'stored' && <Button size="sm" variant="ghost" onClick={() => void curse.remove()}>{t('mods.cfKeyRemove')}</Button>}
+          </Row>
+        ) : (
+          <div className="px-4 py-3">
+            <p className="mb-3 text-[12px] text-muted">{t('mods.cfKeyText')}</p>
+            <CurseForgeKeyInput onSave={curse.save} />
+          </div>
+        )}
       </Group>
       <Group title={t('settings.maintenance')}>
         <Row label={t('logs.title')} hint={t('settings.logsHint')}>

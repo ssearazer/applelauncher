@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { safeJoin } from '../src/main/safe-path.ts'
 import { offlineUuid } from '../src/main/offline.ts'
-import { errorText, fromMmcPack, fromVersionJson, javaFor, neoForgeMatches, splitArgs } from '../src/shared/pure.ts'
+import { errorText, fromMmcPack, fromVersionJson, isNewer, javaFor, neoForgeMatches, splitArgs } from '../src/shared/pure.ts'
 
 test('neoForgeMatches maps NeoForge versions to the game version', () => {
   assert.ok(neoForgeMatches('21.1.77', '1.21.1'))
@@ -63,4 +63,12 @@ test('errorText unwraps AggregateError', () => {
 
 test('offlineUuid matches the server offline-mode UUID', () => {
   assert.equal(offlineUuid('Notch'), 'b50ad385829d3141a2167e7d7539ba7f')
+})
+
+test('isNewer compares release versions numerically', () => {
+  assert.equal(isNewer('1.2.0', '1.1.0'), true)
+  assert.equal(isNewer('v1.2', '1.1.9'), true)
+  assert.equal(isNewer('1.10.0', '1.9.0'), true)
+  assert.equal(isNewer('1.1.0', '1.1.0'), false)
+  assert.equal(isNewer('1.0.9', '1.1.0'), false)
 })

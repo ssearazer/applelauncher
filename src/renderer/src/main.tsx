@@ -2,6 +2,7 @@ import { MotionConfig } from 'framer-motion'
 import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { AiProvider } from './ai-session'
 import { AppProvider, useApp } from './state'
 import './styles.css'
 
@@ -17,9 +18,11 @@ function Motion({ children }: { children: React.ReactNode }) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AppProvider>
-      <Motion>
-        <App />
-      </Motion>
+      <AiProvider>
+        <Motion>
+          <App />
+        </Motion>
+      </AiProvider>
     </AppProvider>
   </StrictMode>
 )

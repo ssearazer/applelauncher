@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
-import { FolderOpen, Pencil, Plus, ScrollText, X } from 'lucide-react'
+import { FolderOpen, Pencil, Plus, Power, ScrollText, SquareX, X, ChevronsDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Block } from '../components/Block'
+import { CrashFix } from '../components/CrashFix'
 import { InstanceDialog, LOADER_NAME } from '../components/InstanceDialog'
 import { api, formatBytes, javaFor, useApp } from '../state'
 import { Button, Empty, IconButton, Progress, Select, cx } from '../ui'
@@ -76,6 +77,23 @@ export function Home() {
             </div>
           </section>
 
+          {!running && <CrashFix inst={selected} crashed={mine && launch.phase === 'error'} />}
+          {running ? (
+            <div className="mt-4 flex items-center gap-3">
+              <div className="min-w-0 flex-1 px-2">
+                <p className="truncate text-[13px] text-muted">{t('home.running', { name: instances.find((i) => i.id === launch.instanceId)?.name ?? selected.name })}</p>
+              </div>
+              <Button className="h-12 rounded-[14px] px-5 text-[14px]" title={t('home.closeGameHint')} onClick={() => attempt(() => api.launch.close())}>
+                <SquareX size={16} /> {t('home.closeGame')}
+              </Button>
+              <Button className="h-12 rounded-[14px] px-5 text-[14px]" title={t('home.toTrayHint')} onClick={() => attempt(() => api.app.hideToTray())}>
+                <ChevronsDown size={16} /> {t('home.toTray')}
+              </Button>
+              <Button variant="primary" className="h-12 rounded-[14px] px-5 text-[14px] font-semibold" title={t('home.quitAllHint')} onClick={() => attempt(() => api.app.quitAll())}>
+                <Power size={16} /> {t('home.quitAll')}
+              </Button>
+            </div>
+          ) : (
           <div className="mt-4 flex items-center gap-3">
             <Select
               up
@@ -110,6 +128,7 @@ export function Home() {
               {label}
             </motion.button>
           </div>
+          )}
         </>
       )}
 

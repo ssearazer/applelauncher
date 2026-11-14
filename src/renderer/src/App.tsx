@@ -1,4 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { AiDock } from './components/AiDock'
+import { Intro } from './components/Intro'
 import { AccountsDialog, LogDialog, Sidebar, TitleBar, Toasts } from './components/Shell'
 import { Home } from './pages/Home'
 import { Mods } from './pages/Mods'
@@ -11,7 +13,7 @@ import { useApp } from './state'
 const PAGES = { home: Home, versions: Versions, mods: Mods, packs: Packs, skins: Skins, settings: Settings }
 
 export function App() {
-  const { page } = useApp()
+  const { page, settings } = useApp()
   const Page = PAGES[page]
   return (
     <div className="flex h-screen bg-bg text-fg">
@@ -28,7 +30,9 @@ export function App() {
       </div>
       <AccountsDialog />
       <LogDialog />
+      <AiDock />
       <Toasts />
+      {settings.animations && <Intro sound />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type {
-  Account, InstalledVersion, Instance, JobState, LaunchState, Loader, McVersion, ModFile, ModrinthHit, Settings
+  Account, AiBuildResult, AiFixResult, AiPlan, AiStep, CurseForgeStatus, InstalledVersion, Instance, JobState, LaunchState, Loader, McVersion, ModFile, ModrinthHit, ModSource, ModVersion, Settings, UpdateInfo
 } from '../shared/types'
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -40,6 +40,7 @@ const api = {
   launch: {
     start: (id: string) => call<void>('launch:start', id),
     cancel: () => call<void>('launch:cancel'),
+    close: () => call<void>('launch:close'),
     verify: (id: string) => call<void>('launch:verify', id),
     state: () => call<LaunchState>('launch:state'),
     logs: () => call<string[]>('launch:logs'),
@@ -48,7 +49,8 @@ const api = {
   },
   accounts: {
     list: () => call<Account[]>('accounts:list'),
-    login: () => call<Account>('accounts:login'),
+    login: () => call<Account | undefined>('accounts:login'),
+    cancelLogin: () => call<void>('accounts:cancelLogin'),
     addOffline: (name: string) => call<Account>('accounts:addOffline', name),
     logout: (id: string) => call<void>('accounts:logout', id),
     skin: (id: string) => call<string | undefined>('accounts:skin', id),
@@ -59,9 +61,23 @@ const api = {
     list: (id: string) => call<ModFile[]>('mods:list', id),
     toggle: (id: string, file: string) => call<void>('mods:toggle', id, file),
     remove: (id: string, file: string) => call<void>('mods:remove', id, file),
-    search: (q: string, id: string | undefined, type: 'mod' | 'modpack', offset = 0, compatibleOnly = true) =>
-      call<{ hits: ModrinthHit[]; total: number }>('mods:search', q, id, type, offset, compatibleOnly),
-    install: (id: string, projectId: string) => call<string[]>('mods:install', id, projectId)
+    search: (q: string, id: string | undefined, type: 'mod' | 'modpack', offset = 0, compatibleOnly = true, source: ModSource = 'modrinth') =>
+      call<{ hits: ModrinthHit[]; total: number }>('mods:search', q, id, type, offset, compatibleOnly, source),
+    versions: (id: string, source: ModSource, projectId: string, all: boolean) => call<ModVersion[]>('mods:versions', id, source, projectId, all),
+    install: (id: string, projectId: string, source: ModSource = 'modrinth', versionId?: string) => call<string[]>('mods:install', id, projectId, source, versionId),
+    changeVersion: (id: string, file: string, source: ModSource, projectId: string, versionId: string) => call<string[]>('mods:changeVersion', id, file, source, projectId, versionId)
+  },
+  curseforge: {
+    status: () => call<CurseForgeStatus>('curseforge:status'),
+    setKey: (key: string) => call<CurseForgeStatus>('curseforge:setKey', key),
+    clearKey: () => call<CurseForgeStatus>('curseforge:clearKey')
+  },
+  ai: {
+    plan: (request: string, instanceId?: string) => call<AiPlan>('ai:plan', request, ...(instanceId ? [instanceId] : [])),
+    fix: (instanceId: string, language: 'ru' | 'en') => call<AiFixResult>('ai:fix', instanceId, language),
+    cancel: () => call<void>('ai:cancel'),
+    build: (planId: string, selected: string[]) => call<AiBuildResult>('ai:build', planId, selected),
+    onStep: (cb: (s: AiStep) => void) => on('ai:step', cb)
   },
   app: {
     info: () => call<{ version: string; electron: string; chrome: string; node: string; gameDir: string; packaged: boolean }>('app:info'),
@@ -71,7 +87,11 @@ const api = {
     openGameDir: () => call<string>('app:openGameDir'),
     openExternal: (url: string) => call<void>('app:openExternal', url),
     clearCache: () => call<void>('app:clearCache'),
-    checkUpdates: () => call<{ status: 'dev' | 'latest' | 'available'; version?: string }>('app:checkUpdates'),
+    hideToTray: () => call<void>('app:hideToTray'),
+    quitAll: () => call<void>('app:quitAll'),
+    checkUpdates: () => call<UpdateInfo>('app:checkUpdates'),
+    installUpdate: () => call<void>('app:installUpdate'),
+    onUpdate: (cb: (i: UpdateInfo) => void) => on('update', cb),
     onJob: (cb: (j: JobState) => void) => on('job', cb)
   }
 }

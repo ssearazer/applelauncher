@@ -41,7 +41,8 @@ const defaults = (): Settings => ({
   checkUpdates: true,
   downloadsDir: app.getPath('downloads'),
   language: 'ru',
-  msClientId: ''
+  msClientId: '',
+  aiKey: ''
 })
 
 let settings: Settings | undefined
