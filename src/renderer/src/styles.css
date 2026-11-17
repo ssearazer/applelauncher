@@ -61,6 +61,8 @@ body {
 }
 input, textarea, .selectable { user-select: text; }
 :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 8px; }
+/* text fields show focus with their border; no extra outline (it also beat Tailwind's outline-none) */
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 button { cursor: default; }
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }

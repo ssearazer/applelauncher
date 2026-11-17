@@ -1,20 +1,27 @@
 import { errorText } from '../shared/pure'
-import { app, BrowserWindow, dialog, nativeTheme, session, shell } from 'electron'
-import electronUpdater from 'electron-updater'
+import dns from 'node:dns'
+import { Agent, setGlobalDispatcher } from 'undici'
+import { app, BrowserWindow, dialog, Menu, nativeImage, nativeTheme, session, shell, Tray } from 'electron'
 import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LOADERS, type JobState, type LaunchState, type Settings } from '../shared/types'
 import * as accounts from './accounts'
+import * as ai from './ai'
 import { OFFLINE_NAME } from './offline'
 import * as instances from './instances'
 import * as mc from './minecraft'
+import * as curseforge from './curseforge'
 import * as mods from './mods'
+import * as updater from './updater'
 import { handle, setAllowedOrigin, z } from './ipc'
 import { gameRoot, getInstance, getInstances, getSettings, instanceDir, logsDir, setSettings, updateInstance } from './store'
 
-const { autoUpdater } = electronUpdater
+// Minecraft CDN downloads (@xmcl/installer) use undici's default 10s connect timeout; raise it for slow/unstable networks
+dns.setDefaultResultOrder('ipv4first')
+setGlobalDispatcher(new Agent({ connect: { timeout: 60_000 }, connections: 16 }))
+
 const here = fileURLToPath(new URL('.', import.meta.url))
 
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -73,6 +80,62 @@ function createWindow() {
   }
 }
 
+/* ---------- tray ---------- */
+
+let tray: Tray | undefined
+let quitting = false
+const TRAY_TEXT = {
+  ru: { open: 'Открыть AppleLauncher', closeGame: 'Закрыть игру', quitAll: 'Закрыть полностью (игра и лаунчер)', tip: 'AppleLauncher' },
+  en: { open: 'Open AppleLauncher', closeGame: 'Close game', quitAll: 'Quit everything (game and launcher)', tip: 'AppleLauncher' }
+}
+
+function showWindow() {
+  tray?.destroy()
+  tray = undefined
+  if (!win) return
+  win.setSkipTaskbar(false)
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+/** Hides the launcher window and leaves an icon in the system tray that brings it back. */
+function hideToTray() {
+  if (!win) return
+  if (!tray) {
+    const file = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(here, '../../build/icon.png')
+    const icon = nativeImage.createFromPath(file)
+    tray = new Tray(icon.isEmpty() ? icon : icon.resize({ width: 32, height: 32 }))
+    const x = TRAY_TEXT[getSettings().language] ?? TRAY_TEXT.ru
+    tray.setToolTip(x.tip)
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: x.open, click: showWindow },
+        { type: 'separator' },
+        { label: x.closeGame, enabled: true, click: () => void mc.closeGame() },
+        { label: x.quitAll, click: () => void quitAll() }
+      ])
+    )
+    tray.on('click', showWindow)
+  }
+  win.setSkipTaskbar(true)
+  win.hide()
+}
+
+/** Closes Minecraft (saving the world first) and then the launcher itself. */
+async function quitAll() {
+  if (quitting) return
+  quitting = true
+  tray?.destroy()
+  tray = undefined
+  try {
+    await mc.closeGame()
+    await mc.cancel() // also stops a download that is still running
+  } finally {
+    app.quit()
+  }
+}
+
 /* ---------- state pushed to the renderer ---------- */
 
 let launchState: LaunchState = { phase: 'idle' }
@@ -120,6 +183,7 @@ const settingsPatch = z
     checkUpdates: z.boolean(),
     downloadsDir: z.string().max(1024).refine(isAbsolute, 'Нужен абсолютный путь'),
     language: z.enum(['ru', 'en']),
+    aiKey: z.string().max(200).regex(/^[\w.-]*$/, 'Ключ OpenRouter выглядит как sk-or-v1-…'),
     msClientId: z.string().max(64).regex(/^[0-9a-fA-F-]*$/, 'Client ID — это GUID из Azure'),
     selectedInstance: z.string().uuid(),
     selectedAccount: z.string().regex(/^[0-9a-f]{32}$/)
@@ -144,6 +208,7 @@ const newInstance = z.object({
 const mcVersion = z.string().regex(/^[\w.\- ]{1,64}$/)
 const fileName = z.string().min(1).max(255)
 const projectId = z.string().regex(/^[\w-]{1,64}$/)
+const modSource = z.enum(['modrinth', 'curseforge']).default('modrinth')
 
 function registerIpc() {
   handle('settings:get', [], () => getSettings())
@@ -188,13 +253,16 @@ function registerIpc() {
   handle('launch:start', [id], (i) => {
     // runs in the background; progress arrives through launch:state
     void mc.start(i, emitLaunch, pushLog, {
-      started: () => getSettings().closeOnLaunch && win?.hide(),
+      started: () => getSettings().closeOnLaunch && hideToTray(),
       exited: () => {
-        if (!win?.isVisible()) win?.show()
+        if (!quitting && (!win?.isVisible() || tray)) showWindow()
       }
     })
   })
   handle('launch:cancel', [], () => mc.cancel())
+  handle('launch:close', [], () => mc.closeGame())
+  handle('app:hideToTray', [], () => hideToTray())
+  handle('app:quitAll', [], () => quitAll())
   handle('launch:verify', [id], (i) =>
     mc.verify(i, emitLaunch).catch((e: unknown) => {
       pushLog(`[AppleLauncher] ${errorText(e)}`)
@@ -207,6 +275,7 @@ function registerIpc() {
 
   handle('accounts:list', [], () => accounts.listAccounts())
   handle('accounts:login', [], () => accounts.login())
+  handle('accounts:cancelLogin', [], () => accounts.cancelLogin())
   handle('accounts:addOffline', [z.string().regex(OFFLINE_NAME)], (n) => accounts.addOffline(n))
   handle('accounts:logout', [z.string()], (a) => accounts.logout(a))
   handle('accounts:skin', [z.string()], (a) => accounts.skinDataUrl(a))
@@ -221,8 +290,22 @@ function registerIpc() {
   handle('mods:list', [id], (i) => mods.listMods(i))
   handle('mods:toggle', [id, fileName], (i, f) => mods.toggleMod(i, f))
   handle('mods:remove', [id, fileName], (i, f) => mods.removeMod(i, f))
-  handle('mods:search', [z.string().max(200), id.optional(), z.enum(['mod', 'modpack']), z.number().int().min(0).max(10000), z.boolean()], (q, i, t, o, c) => mods.search(q, i, t, o, c))
-  handle('mods:install', [id, projectId], (i, p) => withJob(`mod:${p}`, 'Установка мода', () => mods.installMod(i, p)))
+  handle('mods:search', [z.string().max(200), id.optional(), z.enum(['mod', 'modpack']), z.number().int().min(0).max(10000), z.boolean(), modSource], (q, i, t, o, c, s) => mods.search(q, i, t, o, c, s))
+  handle('mods:versions', [id, modSource, projectId, z.boolean()], (i, s, p, all) => mods.listVersions(i, s, p, all))
+  handle('mods:install', [id, projectId, modSource, projectId.optional()], (i, p, s, v) => withJob(`mod:${p}`, 'Установка мода', () => mods.installMod(i, p, undefined, { source: s, versionId: v, replace: true })))
+  handle('mods:changeVersion', [id, fileName, modSource, projectId, projectId], (i, f, s, p, v) => withJob(`mod:${p}`, 'Смена версии мода', () => mods.changeVersion(i, f, s, p, v)))
+
+  handle('curseforge:status', [], () => curseforge.status())
+  handle('curseforge:setKey', [z.string().trim().regex(/^[\w.$/+=-]{16,200}$/, 'Ключ CurseForge выглядит как $2a$10$… (без пробелов)')], (k) => curseforge.setKey(k))
+  handle('curseforge:clearKey', [], () => curseforge.clearKey())
+
+  handle('ai:plan', [z.string().trim().min(3, 'Опишите сборку подробнее').max(4000, 'Слишком длинный запрос'), id.optional()], (request, instanceId) => ai.planPack(request, (s) => send('ai:step', s), instanceId))
+  handle('ai:fix', [id, z.enum(['ru', 'en'])], (instanceId, lang) => {
+    if (mc.isRunning()) throw new Error('Закройте игру, прежде чем исправлять сборку')
+    return ai.fixCrash(instanceId, lang, (s) => send('ai:step', s))
+  })
+  handle('ai:cancel', [], () => ai.cancelAll())
+  handle('ai:build', [z.string().uuid(), z.array(projectId).max(100)], (planId, selected) => withJob('ai-build', 'Создание сборки', (p) => ai.buildPack(planId, selected, p)))
 
   handle('app:info', [], () => ({ version: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node, gameDir: gameRoot(), packaged: app.isPackaged }))
   handle('app:pickDir', [], async () => {
@@ -237,7 +320,7 @@ function registerIpc() {
   handle('app:openGameDir', [], () => shell.openPath(gameRoot()))
   handle('app:openExternal', [z.string().url()], (url) => {
     const host = new URL(url).hostname
-    if (!['www.minecraft.net', 'modrinth.com', 'portal.azure.com', 'aka.ms', 'learn.microsoft.com'].includes(host)) throw new Error('Ссылка не разрешена')
+    if (!['www.minecraft.net', 'modrinth.com', 'www.curseforge.com', 'console.curseforge.com', 'github.com', 'portal.azure.com', 'aka.ms', 'learn.microsoft.com', 'openrouter.ai'].includes(host)) throw new Error('Ссылка не разрешена')
     return shell.openExternal(url)
   })
   handle('app:clearCache', [], async () => {
@@ -246,12 +329,8 @@ function registerIpc() {
     const versions = join(gameRoot(), 'versions')
     if (existsSync(versions)) for (const v of await readdir(versions)) await rm(join(versions, v, `${v}-natives`), { recursive: true, force: true })
   })
-  handle('app:checkUpdates', [], async () => {
-    if (!app.isPackaged) return { status: 'dev' as const }
-    const r = await autoUpdater.checkForUpdates()
-    const latest = r?.updateInfo.version
-    return latest && latest !== app.getVersion() ? { status: 'available' as const, version: latest } : { status: 'latest' as const }
-  })
+  handle('app:checkUpdates', [], () => updater.check())
+  handle('app:installUpdate', [], () => withJob('update', 'Обновление AppleLauncher', (p) => updater.installFromGithub(p)))
 }
 
 app.whenReady().then(() => {
@@ -259,11 +338,7 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   nativeTheme.on('updated', applyTheme)
-  if (app.isPackaged && getSettings().checkUpdates) autoUpdater.checkForUpdatesAndNotify().catch(() => undefined)
+  if (app.isPackaged && getSettings().checkUpdates) updater.checkOnStartup((info) => send('update', info))
 })
-app.on('second-instance', () => {
-  if (win?.isMinimized()) win.restore()
-  win?.show()
-  win?.focus()
-})
+app.on('second-instance', () => showWindow())
 app.on('window-all-closed', () => app.quit())

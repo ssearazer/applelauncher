@@ -1,14 +1,24 @@
-import { Blocks, Boxes, Download, FileArchive, FileDown, FolderInput, FileUp, FolderOpen, Pencil, Play, Plus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { Blocks, Boxes, Download, FileArchive, FileDown, FolderInput, FileUp, FolderOpen, Pencil, Play, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { Instance } from '../../../shared/types'
 import { InstanceDialog, LOADER_NAME } from '../components/InstanceDialog'
+import { useAi } from '../ai-session'
 import { api, useApp } from '../state'
 import { Button, Empty, IconButton, Modal, PageHeader, SearchField, Segmented, Skeleton } from '../ui'
+import { AiBuilder } from './AiBuilder'
 import { InstalledMods, ModIcon, compact, useModrinth } from './Mods'
 
 export function Packs() {
   const { t, attempt, reloadInstances, setSettings, toast } = useApp()
-  const [tab, setTab] = useState<'mine' | 'browse'>('mine')
+  const ai = useAi()
+  const [tab, setTab] = useState<'mine' | 'browse' | 'ai'>(() => (ai.pendingOpen ? 'ai' : 'mine'))
+  const { pendingOpen, clearOpen } = ai
+  // the corner widget asks for the assistant tab, also when this page is already open
+  useEffect(() => {
+    if (!pendingOpen) return
+    setTab('ai')
+    clearOpen()
+  }, [pendingOpen, clearOpen])
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
 
@@ -24,13 +34,16 @@ export function Packs() {
   return (
     <div>
       <PageHeader title={t('nav.packs')} subtitle={t('packs.subtitle')}>
+        <Button onClick={() => setTab('ai')}><Sparkles size={14} /> {t('ai.headerBtn')}</Button>
         <Button onClick={() => setImporting(true)}><FileUp size={14} /> {t('packs.import')}</Button>
         <Button variant="primary" onClick={() => setCreating(true)}><Plus size={14} /> {t('instance.new')}</Button>
       </PageHeader>
       <div className="mb-4">
-        <Segmented label={t('nav.packs')} value={tab} onChange={setTab} options={[{ value: 'mine', label: t('packs.mine') }, { value: 'browse', label: 'Modrinth' }]} />
+        <Segmented label={t('nav.packs')} value={tab} onChange={setTab} options={[{ value: 'mine', label: t('packs.mine') }, { value: 'browse', label: 'Modrinth' }, { value: 'ai', label: t('ai.tab') }]} />
       </div>
-      {tab === 'mine' ? <MyPacks onCreate={() => setCreating(true)} /> : <BrowsePacks onInstalled={() => setTab('mine')} />}
+      {tab === 'mine' && <MyPacks onCreate={() => setCreating(true)} />}
+      {tab === 'browse' && <BrowsePacks onInstalled={() => setTab('mine')} />}
+      {tab === 'ai' && <AiBuilder onCreated={() => setTab('mine')} />}
       <InstanceDialog open={creating} onClose={() => setCreating(false)} />
       <Modal open={importing} onClose={() => setImporting(false)} title={t('packs.importTitle')}>
         <div className="flex flex-col gap-1.5">
@@ -56,6 +69,7 @@ export function Packs() {
 
 function MyPacks({ onCreate }: { onCreate: () => void }) {
   const { t, instances, selected, attempt, reloadInstances, setSettings, go, toast } = useApp()
+  const ai = useAi()
   const [edit, setEdit] = useState<Instance>()
   const [mods, setMods] = useState<Instance>()
   const [removing, setRemoving] = useState<Instance>()
@@ -87,7 +101,10 @@ function MyPacks({ onCreate }: { onCreate: () => void }) {
             <div className="mt-4 flex items-center gap-1">
               <Button size="sm" variant="primary" onClick={async () => { await setSettings({ selectedInstance: i.id }); go('home') }}><Play size={12} /> {t('packs.open')}</Button>
               <span className="flex-1" />
-              {i.loader !== 'vanilla' && <IconButton label={t('nav.mods')} onClick={() => setMods(i)}><Blocks size={15} /></IconButton>}
+              {i.loader !== 'vanilla' && <>
+                <IconButton label={t('ai.addToPack')} onClick={() => { ai.setBaseId(i.id); ai.openBuilder() }}><Sparkles size={15} /></IconButton>
+                <IconButton label={t('nav.mods')} onClick={() => setMods(i)}><Blocks size={15} /></IconButton>
+              </>}
               <IconButton label={t('instance.edit')} onClick={() => setEdit(i)}><Pencil size={15} /></IconButton>
               <IconButton label={t('common.openFolder')} onClick={() => attempt(() => api.instances.open(i.id))}><FolderOpen size={15} /></IconButton>
               <IconButton label={t('packs.export')} onClick={async () => { if (await attempt(() => api.instances.exportPack(i.id))) toast(t('packs.exported')) }}><FileDown size={15} /></IconButton>

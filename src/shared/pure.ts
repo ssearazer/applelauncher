@@ -67,3 +67,80 @@ export function errorText(e: unknown): string {
   if (e instanceof Error) return e.message || (e as { code?: string }).code || e.name
   return String(e)
 }
+
+/**
+ * The first JSON object in a model reply. Skips <think> blocks and code fences and balances braces
+ * outside of strings, so prose before or after the object does not break parsing.
+ */
+export function extractJson(text: string): unknown {
+  const src = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '')
+  for (let start = src.indexOf('{'); start >= 0; start = src.indexOf('{', start + 1)) {
+    let depth = 0, inStr = false, esc = false
+    for (let i = start; i < src.length; i++) {
+      const c = src[i]
+      if (inStr) {
+        if (esc) esc = false
+        else if (c === '\\') esc = true
+        else if (c === '"') inStr = false
+      } else if (c === '"') inStr = true
+      else if (c === '{') depth++
+      else if (c === '}' && --depth === 0) {
+        try {
+          return JSON.parse(src.slice(start, i + 1))
+        } catch {
+          break // not valid JSON from this brace; try the next one
+        }
+      }
+    }
+  }
+  throw new Error('В ответе модели нет JSON-объекта')
+}
+
+/** Single-line display text from untrusted input: control characters removed, spaces collapsed, length capped. */
+export function cleanText(s: unknown, max: number): string {
+  // eslint-disable-next-line no-control-regex
+  const t = String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim()
+  return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t
+}
+
+/** True when version `a` (e.g. "v1.2.0") is newer than `b`. Compares numeric parts; a missing part counts as 0. */
+export function isNewer(a: string, b: string): boolean {
+  const parts = (v: string) => v.replace(/^v/i, '').split(/[.+-]/).slice(0, 3).map((n) => Number.parseInt(n, 10) || 0)
+  const x = parts(a), y = parts(b)
+  for (let i = 0; i < 3; i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0)
+    if (d) return d > 0
+  }
+  return false
+}
+
+/** Text of an OpenAI-style chat completion: the content of the first choice (a string or a list of text parts). */
+export function completionText(data: unknown): string {
+  const d = data as { choices?: { message?: { content?: string | { type?: string; text?: string }[] | null } }[] }
+  const content = d?.choices?.[0]?.message?.content
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) return content.map((p) => (typeof p?.text === 'string' ? p.text : '')).join('')
+  return ''
+}
+
+/**
+ * Search hits from several queries mixed in turn (first of each list, then second of each, ...), duplicates removed,
+ * so every theme of a request stays represented when only the first `max` can be used.
+ */
+export function interleaveHits<T extends { project_id: string }>(lists: T[][], max: number): T[] {
+  const out: T[] = []
+  const seen = new Set<string>()
+  for (let i = 0; out.length < max && lists.some((l) => i < l.length); i++) {
+    for (const l of lists) {
+      const h = l[i]
+      if (h && out.length < max && !seen.has(h.project_id)) {
+        seen.add(h.project_id)
+        out.push(h)
+      }
+    }
+  }
+  return out
+}
+
+/** True for the assistant's messages about a spent quota, a rejected key or a rate limit: the player can fix those with their own key. */
+export const isAiLimitError = (message: string | undefined): boolean => !!message && /лимит|ключ отклонён|rate limit|quota/i.test(message)

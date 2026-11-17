@@ -246,17 +246,21 @@ export function Select({ value, options, onChange, label, searchable, placeholde
 export function Modal({ open, onClose, title, children, footer, width = 460 }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; width?: number }) {
   const { t } = useApp()
   const ref = useRef<HTMLDivElement>(null)
+  // callers pass a fresh onClose every render; keep it in a ref so the effect below runs only when the dialog opens/closes.
+  // (Otherwise every keystroke re-ran it and stole focus from the input.)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose })
   useEffect(() => {
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onCloseRef.current()
     window.addEventListener('keydown', key)
     requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('input,button:not([data-close]),[tabindex]')?.focus())
     return () => {
       window.removeEventListener('keydown', key)
       prev?.focus()
     }
-  }, [open, onClose])
+  }, [open])
   return (
     <AnimatePresence>
       {open && (
